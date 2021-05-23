@@ -47,7 +47,7 @@ You'll need to install `node.js`:
 -   Mac
     -   run this command in your terminal: `brew install node`
 
-Then run `yarn` inside the root project directory to install:
+Then run `yarn` inside the root project directory to install the dependencies:
 
 Then simply run the server with:
 
