@@ -13,12 +13,12 @@ module.exports = server => {
      * information. After all of that happens, they'll finally be able to complete
      * the peer connection and will be streaming audio/video between eachother.
      */
-    io.on('connection', function (socket) {
+    io.on('connection', socket => {
         socket.channels = {}
         sockets[socket.id] = socket
 
         console.log('[' + socket.id + '] connection accepted')
-        socket.on('disconnect', function () {
+        socket.on('disconnect', () => {
             for (var channel in socket.channels) {
                 part(channel)
             }
@@ -26,7 +26,7 @@ module.exports = server => {
             delete sockets[socket.id]
         })
 
-        socket.on('join', function (config) {
+        socket.on('join', config => {
             console.log('[' + socket.id + '] join ', config)
             let channel = config.channel
             let userdata = config.userdata
@@ -58,6 +58,16 @@ module.exports = server => {
             socket.channels[channel] = channel
         })
 
+        socket.on('part', part)
+
+        socket.on('relayICECandidate', config => {
+            relayICECandidate(config)
+        })
+
+        socket.on('relaySessionDescription', config => {
+            relaySessionDescription(config)
+        })
+
         function part(channel) {
             console.log('[' + socket.id + '] part ')
 
@@ -74,39 +84,37 @@ module.exports = server => {
                 socket.emit('removePeer', { peer_id: id })
             }
         }
-        socket.on('part', part)
 
-        socket.on('relayICECandidate', function (config) {
+        function relayICECandidate(config) {
             let peer_id = config.peer_id
             let ice_candidate = config.ice_candidate
-            console.log(
-                '[' +
-                    socket.id +
-                    '] relaying ICE candidate to [' +
-                    peer_id +
-                    '] ',
-                ice_candidate
-            )
-
+            // console.log(
+            //     '[' +
+            //         socket.id +
+            //         '] relaying ICE candidate to [' +
+            //         peer_id +
+            //         '] ',
+            //     ice_candidate
+            // )
             if (peer_id in sockets) {
                 sockets[peer_id].emit('iceCandidate', {
                     peer_id: socket.id,
                     ice_candidate: ice_candidate,
                 })
             }
-        })
+        }
 
-        socket.on('relaySessionDescription', function (config) {
+        function relaySessionDescription(config) {
             let peer_id = config.peer_id
             let session_description = config.session_description
-            console.log(
-                '[' +
-                    socket.id +
-                    '] relaying session description to [' +
-                    peer_id +
-                    '] ',
-                session_description
-            )
+            // console.log(
+            //     '[' +
+            //         socket.id +
+            //         '] relaying session description to [' +
+            //         peer_id +
+            //         '] ',
+            //     session_description
+            // )
 
             if (peer_id in sockets) {
                 sockets[peer_id].emit('sessionDescription', {
@@ -114,6 +122,6 @@ module.exports = server => {
                     session_description: session_description,
                 })
             }
-        })
+        }
     })
 }

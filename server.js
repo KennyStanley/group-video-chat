@@ -3,7 +3,7 @@ const PORT = process.env.PORT || 3000
 const useHTTPS = false
 
 // Setup
-const app = require('./routes')
+const routes = require('./routes')
 
 let server = null
 if (useHTTPS) {
@@ -13,10 +13,10 @@ if (useHTTPS) {
         key: fs.readFileSync('certs/key.pem', 'utf-8'),
         cert: fs.readFileSync('certs/cert.pem', 'utf-8'),
     }
-    server = https.createServer(options, app)
+    server = https.createServer(options, routes)
 } else {
     const http = require('http')
-    server = http.createServer(app)
+    server = http.createServer(routes)
 }
 
 server.listen(PORT, null, () => {

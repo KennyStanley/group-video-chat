@@ -21,9 +21,9 @@ function init() {
     // signaling_socket = io(SIGNALING_SERVER);
     signaling_socket = io()
 
-    signaling_socket.on('connect', function () {
+    signaling_socket.on('connect', () => {
         console.log('Connected to signaling server')
-        setup_local_media(function () {
+        setup_local_media(() => {
             /* once the user has given us access to their
              * microphone/camcorder, join the channel and start peering up */
             join_chat_channel(DEFAULT_CHANNEL, {
@@ -31,7 +31,7 @@ function init() {
             })
         })
     })
-    signaling_socket.on('disconnect', function () {
+    signaling_socket.on('disconnect', () => {
         console.log('Disconnected from signaling server')
         /* Tear down all of our peer connections and remove all the
          * media divs when we disconnect */
@@ -58,7 +58,7 @@ function init() {
      * in the channel you will connect directly to the other 5, so there will be a total of 15
      * connections in the network).
      */
-    signaling_socket.on('addPeer', function (config) {
+    signaling_socket.on('addPeer', config => {
         console.log('Signaling server said to add peer:', config)
         let peer_id = config.peer_id
         if (peer_id in peers) {
@@ -75,7 +75,7 @@ function init() {
         )
         peers[peer_id] = peer_connection
 
-        peer_connection.onicecandidate = function (event) {
+        peer_connection.onicecandidate = event => {
             if (event.candidate) {
                 signaling_socket.emit('relayICECandidate', {
                     peer_id: peer_id,
@@ -86,7 +86,7 @@ function init() {
                 })
             }
         }
-        peer_connection.onaddstream = function (event) {
+        peer_connection.onaddstream = event => {
             console.log('onAddStream', event)
             let remote_media = USE_VIDEO
                 ? document.createElement('video')
@@ -100,18 +100,6 @@ function init() {
             document.querySelector('body').append(remote_media)
             attachMediaStream(remote_media, event.stream)
         }
-        // peer_connection.onaddstream = function(event) {
-        //     console.log("onAddStream", event);
-        //     let remote_media = USE_VIDEO ? $("<video>") : $("<audio>");
-        //     remote_media.attr("autoplay", "autoplay");
-        //     if (MUTE_AUDIO_BY_DEFAULT) {
-        //         remote_media.attr("muted", "true");
-        //     }
-        //     remote_media.attr("controls", "");
-        //     peer_media_elements[peer_id] = remote_media;
-        //     $('body').append(remote_media);
-        //     attachMediaStream(remote_media[0], event.stream);
-        // }
 
         /* Add our local stream */
         peer_connection.addStream(local_media_stream)
@@ -124,26 +112,26 @@ function init() {
         if (config.should_create_offer) {
             console.log('Creating RTC offer to ', peer_id)
             peer_connection.createOffer(
-                function (local_description) {
+                local_description => {
                     console.log(
                         'Local offer description is: ',
                         local_description
                     )
                     peer_connection.setLocalDescription(
                         local_description,
-                        function () {
+                        () => {
                             signaling_socket.emit('relaySessionDescription', {
                                 peer_id: peer_id,
                                 session_description: local_description,
                             })
                             console.log('Offer setLocalDescription succeeded')
                         },
-                        function () {
+                        () => {
                             Alert('Offer setLocalDescription failed!')
                         }
                     )
                 },
-                function (error) {
+                error => {
                     console.log('Error sending offer: ', error)
                 }
             )
@@ -156,7 +144,7 @@ function init() {
      * the 'offerer' sends a description to the 'answerer' (with type
      * "offer"), then the answerer sends one back (with type "answer").
      */
-    signaling_socket.on('sessionDescription', function (config) {
+    signaling_socket.on('sessionDescription', config => {
         console.log('Remote description received: ', config)
         let peer_id = config.peer_id
         let peer = peers[peer_id]
@@ -166,19 +154,19 @@ function init() {
         let desc = new RTCSessionDescription(remote_description)
         let stuff = peer.setRemoteDescription(
             desc,
-            function () {
+            () => {
                 console.log('setRemoteDescription succeeded')
                 if (remote_description.type == 'offer') {
                     console.log('Creating answer')
                     peer.createAnswer(
-                        function (local_description) {
+                        local_description => {
                             console.log(
                                 'Answer description is: ',
                                 local_description
                             )
                             peer.setLocalDescription(
                                 local_description,
-                                function () {
+                                () => {
                                     signaling_socket.emit(
                                         'relaySessionDescription',
                                         {
@@ -191,19 +179,19 @@ function init() {
                                         'Answer setLocalDescription succeeded'
                                     )
                                 },
-                                function () {
+                                () => {
                                     Alert('Answer setLocalDescription failed!')
                                 }
                             )
                         },
-                        function (error) {
+                        error => {
                             console.log('Error creating answer: ', error)
                             console.log(peer)
                         }
                     )
                 }
             },
-            function (error) {
+            error => {
                 console.log('setRemoteDescription error: ', error)
             }
         )
@@ -214,7 +202,7 @@ function init() {
      * The offerer will send a number of ICE Candidate blobs to the answerer so they
      * can begin trying to find the best path to one another on the net.
      */
-    signaling_socket.on('iceCandidate', function (config) {
+    signaling_socket.on('iceCandidate', config => {
         let peer = peers[config.peer_id]
         let ice_candidate = config.ice_candidate
         peer.addIceCandidate(new RTCIceCandidate(ice_candidate))
@@ -230,7 +218,7 @@ function init() {
      * signaling_socket.on('disconnect') code will kick in and tear down
      * all the peer sessions.
      */
-    signaling_socket.on('removePeer', function (config) {
+    signaling_socket.on('removePeer', config => {
         console.log('Signaling server said to remove peer:', config)
         let peer_id = config.peer_id
         if (peer_id in peer_media_elements) {
@@ -264,7 +252,7 @@ function setup_local_media(callback, errorback) {
         navigator.mozGetUserMedia ||
         navigator.msGetUserMedia
 
-    attachMediaStream = function (element, stream) {
+    attachMediaStream = (element, stream) => {
         if (typeof element.srcObject == 'object') {
             element.srcObject = stream
         } else {
@@ -274,7 +262,7 @@ function setup_local_media(callback, errorback) {
 
     navigator.getUserMedia(
         { audio: USE_AUDIO, video: USE_VIDEO },
-        function (stream) {
+        stream => {
             /* user accepted access to a/v */
             console.log('Access granted to audio/video')
             local_media_stream = stream
@@ -292,7 +280,7 @@ function setup_local_media(callback, errorback) {
 
             if (callback) callback()
         },
-        function () {
+        () => {
             /* user denied access to a/v */
             console.log('Access denied for audio/video')
             alert(
