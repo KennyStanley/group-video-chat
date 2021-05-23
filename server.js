@@ -1,6 +1,6 @@
 // Config
 const PORT = process.env.PORT || 3000
-const useHTTPS = true
+const useHTTPS = false
 
 // Setup
 const app = require('./routes')
