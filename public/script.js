@@ -33,6 +33,7 @@ function init() {
             })
         })
     })
+
     signaling_socket.on('disconnect', () => {
         console.log('Disconnected from signaling server')
         /* Tear down all of our peer connections and remove all the
@@ -47,9 +48,11 @@ function init() {
         peers = {}
         peer_media_elements = {}
     })
+
     function join_chat_channel(channel, userdata) {
         signaling_socket.emit('join', { channel: channel, userdata: userdata })
     }
+
     function part_chat_channel(channel) {
         signaling_socket.emit('part', channel)
     }
