@@ -270,10 +270,7 @@ function setup_local_media(callback, errorback) {
                 ? document.createElement('video')
                 : document.createElement('audio')
             local_media.setAttribute('autoplay', 'autoplay')
-            local_media.setAttribute(
-                'muted',
-                'true'
-            ) /* always mute ourselves by default */
+            local_media.muted = true /* always mute ourselves by default */
             local_media.setAttribute('controls', '')
             document.querySelector('body').append(local_media)
             attachMediaStream(local_media, stream)
