@@ -1,5 +1,4 @@
 /** CONFIG **/
-// const SIGNALING_SERVER = "https://localhost";
 let USE_AUDIO = true
 let USE_VIDEO = true
 const DEFAULT_CHANNEL = 'some-global-channel-name'
@@ -18,16 +17,19 @@ let peer_media_elements =
 
 function init() {
     console.log('Connecting to signaling server')
-    // signaling_socket = io(SIGNALING_SERVER);
     signaling_socket = io()
+
+    let room = getRoomID()
+    removeStartScreen()
+    addRoomID(room)
 
     signaling_socket.on('connect', () => {
         console.log('Connected to signaling server')
         setup_local_media(() => {
             /* once the user has given us access to their
              * microphone/camcorder, join the channel and start peering up */
-            join_chat_channel(DEFAULT_CHANNEL, {
-                'whatever-you-want-here': 'stuff',
+            join_chat_channel(room, {
+                name: '',
             })
         })
     })
@@ -59,11 +61,11 @@ function init() {
      * connections in the network).
      */
     signaling_socket.on('addPeer', config => {
-        console.log('Signaling server said to add peer:', config)
+        console.log(`Signaling server said to add peer: ${config}`)
         let peer_id = config.peer_id
         if (peer_id in peers) {
             /* This could happen if the user joins multiple channels where the other peer is also in. */
-            console.log('Already connected to peer ', peer_id)
+            console.log(`Already connected to peer ${peer_id}`)
             return
         }
         let peer_connection = new RTCPeerConnection(
@@ -87,7 +89,7 @@ function init() {
             }
         }
         peer_connection.onaddstream = event => {
-            console.log('onAddStream', event)
+            console.log(`onAddStream ${event}`)
             let remote_media = USE_VIDEO
                 ? document.createElement('video')
                 : document.createElement('audio')
@@ -110,12 +112,11 @@ function init() {
          * create an offer, then send back an answer 'sessionDescription' to us
          */
         if (config.should_create_offer) {
-            console.log('Creating RTC offer to ', peer_id)
+            console.log(`Creating RTC offer to ${peer_id}`)
             peer_connection.createOffer(
                 local_description => {
                     console.log(
-                        'Local offer description is: ',
-                        local_description
+                        `Local offer description is: ${local_description}`
                     )
                     peer_connection.setLocalDescription(
                         local_description,
@@ -132,7 +133,7 @@ function init() {
                     )
                 },
                 error => {
-                    console.log('Error sending offer: ', error)
+                    console.log(`Error sending offer: ${error}`)
                 }
             )
         }
@@ -145,7 +146,7 @@ function init() {
      * "offer"), then the answerer sends one back (with type "answer").
      */
     signaling_socket.on('sessionDescription', config => {
-        console.log('Remote description received: ', config)
+        console.log(`Remote description received: ${config}`)
         let peer_id = config.peer_id
         let peer = peers[peer_id]
         let remote_description = config.session_description
@@ -161,8 +162,7 @@ function init() {
                     peer.createAnswer(
                         local_description => {
                             console.log(
-                                'Answer description is: ',
-                                local_description
+                                `Answer description is: ${local_description}`
                             )
                             peer.setLocalDescription(
                                 local_description,
@@ -185,17 +185,17 @@ function init() {
                             )
                         },
                         error => {
-                            console.log('Error creating answer: ', error)
+                            console.log(`Error creating answer: ${error}`)
                             console.log(peer)
                         }
                     )
                 }
             },
             error => {
-                console.log('setRemoteDescription error: ', error)
+                console.log(`setRemoteDescription error: ${error}`)
             }
         )
-        console.log('Description Object: ', desc)
+        console.log(`Description Object: ${desc}`)
     })
 
     /**
@@ -219,7 +219,7 @@ function init() {
      * all the peer sessions.
      */
     signaling_socket.on('removePeer', config => {
-        console.log('Signaling server said to remove peer:', config)
+        console.log(`Signaling server said to remove peer: ${config}`)
         let peer_id = config.peer_id
         if (peer_id in peer_media_elements) {
             peer_media_elements[peer_id].remove()
@@ -233,9 +233,7 @@ function init() {
     })
 }
 
-/***********************/
 /** Local media stuff **/
-/***********************/
 function setup_local_media(callback, errorback) {
     if (local_media_stream != null) {
         /* ie, if we've already been initialized */
@@ -287,3 +285,23 @@ function setup_local_media(callback, errorback) {
         }
     )
 }
+
+function getRoomID() {
+    let room = document.querySelector('#room').value
+    return room
+}
+
+function removeStartScreen() {
+    document.querySelector('#start-screen').style.display = 'none'
+}
+
+function addRoomID(ID) {
+    let roomID = document.createElement('h1')
+    roomID.innerHTML = `Room ID: ${ID}`
+    roomID.setAttribute('id', 'room-id')
+    document.querySelector('body').append(roomID)
+}
+
+document.querySelector('#join').addEventListener('click', init)
+document.querySelector('#room').focus()
+document.querySelector('#room').select()
