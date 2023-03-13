@@ -107,7 +107,9 @@ function init() {
     }
 
     /* Add our local stream */
-    peer_connection.addStream(local_media_stream)
+    local_media_stream.getTracks().forEach(track => {
+      peer_connection.addTrack(track, local_media_stream)
+    })
 
     /* Only one side of the peer connection should create the
      * offer, the signaling server picks one to be the offerer.
