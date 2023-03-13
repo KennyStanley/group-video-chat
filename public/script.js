@@ -11,9 +11,9 @@ const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }]
 let signaling_socket = null /* our socket.io connection to our webserver */
 let local_media_stream = null /* our own microphone / webcam */
 let peers =
-    {} /* keep track of our peer connections, indexed by peer_id (aka socket.io id) */
+  {} /* keep track of our peer connections, indexed by peer_id (aka socket.io id) */
 let peer_media_elements =
-    {} /* keep track of our <video>/<audio> tags, indexed by peer_id */
+  {} /* keep track of our <video>/<audio> tags, indexed by peer_id */
 
 function init() {
   console.log('Connecting to signaling server')
@@ -63,8 +63,8 @@ function init() {
    * in the channel you will connect directly to the other 5, so there will be a total of 15
    * connections in the network).
    */
-  signaling_socket.on('addPeer', config => {
-    console.log(`Signaling server said to add peer: ${config}`)
+  signaling_socket.on('addPeer', async config => {
+    console.log('Signaling server said to add peer:', config)
     let peer_id = config.peer_id
     if (peer_id in peers) {
       /* This could happen if the user joins multiple channels where the other peer is also in. */
@@ -91,19 +91,21 @@ function init() {
         })
       }
     }
-    peer_connection.onaddstream = event => {
-      console.log(`onAddStream ${event}`)
+    peer_connection.ontrack = event => {
+      console.log('onTrack', event)
+      if (event.track.kind === 'audio' && USE_VIDEO) return
       let remote_media = USE_VIDEO
         ? document.createElement('video')
         : document.createElement('audio')
       remote_media.setAttribute('autoplay', 'true')
+      remote_media.setAttribute('playsinline', 'true')
       if (MUTE_AUDIO_BY_DEFAULT) {
         remote_media.setAttribute('muted', 'true')
       }
       remote_media.setAttribute('controls', '')
       peer_media_elements[peer_id] = remote_media
       document.querySelector('body').append(remote_media)
-      attachMediaStream(remote_media, event.stream)
+      attachMediaStream(remote_media, event.streams[0])
     }
 
     /* Add our local stream */
@@ -118,25 +120,32 @@ function init() {
      */
     if (config.should_create_offer) {
       console.log(`Creating RTC offer to ${peer_id}`)
-      peer_connection.createOffer(
+      peer_connection.createOffer().then(
         local_description => {
-          console.log(`Local offer description is: ${local_description}`)
-          peer_connection.setLocalDescription(
-            local_description,
-            () => {
-              signaling_socket.emit('relaySessionDescription', {
-                peer_id: peer_id,
-                session_description: local_description,
-              })
-              console.log('Offer setLocalDescription succeeded')
-            },
-            () => {
-              Alert('Offer setLocalDescription failed!')
-            }
-          )
+          console.log('Local offer description is:', local_description)
+          peer_connection.setLocalDescription(local_description).then(() => {
+            signaling_socket.emit('relaySessionDescription', {
+              peer_id: peer_id,
+              session_description: local_description,
+            })
+            console.log('Offer setLocalDescription succeeded')
+          })
+          //   peer_connection.setLocalDescription(
+          //     local_description,
+          //     () => {
+          //       signaling_socket.emit('relaySessionDescription', {
+          //         peer_id: peer_id,
+          //         session_description: local_description,
+          //       })
+          //       console.log('Offer setLocalDescription succeeded')
+          //     },
+          //     () => {
+          //       Alert('Offer setLocalDescription failed!')
+          //     }
+          //   )
         },
         error => {
-          console.log(`Error sending offer: ${error}`)
+          console.log('Error sending offer:', error)
         }
       )
     }
@@ -149,24 +158,22 @@ function init() {
    * "offer"), then the answerer sends one back (with type "answer").
    */
   signaling_socket.on('sessionDescription', config => {
-    console.log(`Remote description received: ${config}`)
+    console.log('Remote description received:', config)
     let peer_id = config.peer_id
     let peer = peers[peer_id]
     let remote_description = config.session_description
     console.log(config.session_description)
 
     let desc = new RTCSessionDescription(remote_description)
-    let stuff = peer.setRemoteDescription(
-      desc,
+    let stuff = peer.setRemoteDescription(desc).then(
       () => {
         console.log('setRemoteDescription succeeded')
         if (remote_description.type == 'offer') {
           console.log('Creating answer')
-          peer.createAnswer(
+          peer.createAnswer().then(
             local_description => {
-              console.log(`Answer description is: ${local_description}`)
-              peer.setLocalDescription(
-                local_description,
+              console.log('Answer description is:', local_description)
+              peer.setLocalDescription(local_description).then(
                 () => {
                   signaling_socket.emit('relaySessionDescription', {
                     peer_id: peer_id,
@@ -180,17 +187,17 @@ function init() {
               )
             },
             error => {
-              console.log(`Error creating answer: ${error}`)
+              console.log('Error creating answer:', error)
               console.log(peer)
             }
           )
         }
       },
       error => {
-        console.log(`setRemoteDescription error: ${error}`)
+        console.log('setRemoteDescription error:', error)
       }
     )
-    console.log(`Description Object: ${desc}`)
+    console.log('Description Object:', desc)
   })
 
   /**
@@ -214,7 +221,7 @@ function init() {
    * all the peer sessions.
    */
   signaling_socket.on('removePeer', config => {
-    console.log(`Signaling server said to remove peer: ${config}`)
+    console.log('Signaling server said to remove peer:', config)
     let peer_id = config.peer_id
     if (peer_id in peer_media_elements) {
       peer_media_elements[peer_id].remove()
@@ -257,7 +264,8 @@ function setup_local_media(callback, errorback) {
         let local_media = USE_VIDEO
           ? document.createElement('video')
           : document.createElement('audio')
-        local_media.setAttribute('autoplay', 'autoplay')
+        local_media.setAttribute('autoplay', 'true')
+        local_media.setAttribute('playsinline', 'true')
         local_media.muted = true /* always mute ourselves by default */
         local_media.setAttribute('controls', '')
         document.querySelector('body').append(local_media)
@@ -265,14 +273,14 @@ function setup_local_media(callback, errorback) {
 
         if (callback) callback()
       },
-        () => {
-          /* user denied access to a/v */
-          console.log('Access denied for audio/video')
-          alert(
-            'You chose not to provide access to the camera/microphone, demo will not work.'
-          )
-          if (errorback) errorback()
-        }
+      () => {
+        /* user denied access to a/v */
+        console.log('Access denied for audio/video')
+        alert(
+          'You chose not to provide access to the camera/microphone, demo will not work.'
+        )
+        if (errorback) errorback()
+      }
     )
 }
 
